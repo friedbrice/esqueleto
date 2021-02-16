@@ -71,7 +71,7 @@ import Data.Time
 import Control.Monad.Fail (MonadFail)
 #endif
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Control.Monad.Logger (MonadLogger(..), NoLoggingT, runNoLoggingT)
+import Control.Monad.Logger (MonadLogger(..), MonadLoggerIO, NoLoggingT, runNoLoggingT)
 import Control.Monad.Trans.Reader (ReaderT)
 import qualified Data.Attoparsec.Text as AP
 import Data.Char (toLower, toUpper)
@@ -2508,6 +2508,7 @@ insert' v = flip Entity v <$> insert v
 type RunDbMonad m = ( MonadUnliftIO m
                     , MonadIO m
                     , MonadLogger m
+                    , MonadLoggerIO m
                     , MonadCatch m )
 
 #if __GLASGOW_HASKELL__ >= 806

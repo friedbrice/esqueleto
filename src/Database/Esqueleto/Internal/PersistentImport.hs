@@ -118,7 +118,9 @@ module Database.Esqueleto.Internal.PersistentImport
     Attr,
     Checkmark(..),
     CompositeDef(..),
-    DBName(..),
+    ConstraintNameDB(..),
+    EntityNameDB(..),
+    FieldNameDB(..),
     EmbedEntityDef(..),
     EmbedFieldDef(..),
     EntityDef(..),
@@ -127,7 +129,9 @@ module Database.Esqueleto.Internal.PersistentImport
     FieldType(..),
     ForeignDef(..),
     ForeignFieldDef,
-    HaskellName(..),
+    ConstraintNameHS(..),
+    EntityNameHS(..),
+    FieldNameHS(..),
     IsNullable(..),
     OnlyUniqueException(..),
     PersistException(..),
@@ -176,3 +180,9 @@ import Database.Persist.Sql hiding
        , (||.)
        , exists
        )
+
+import Control.Monad.Logger (MonadLogger, MonadLoggerIO, askLoggerIO)
+import Control.Monad.Trans.Resource (MonadUnliftIO)
+
+askLogFunc :: (MonadUnliftIO m, MonadLogger m, MonadLoggerIO m) => m LogFunc
+askLogFunc = askLoggerIO

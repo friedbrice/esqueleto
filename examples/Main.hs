@@ -23,7 +23,7 @@ import Control.Monad (void)
 import Control.Monad (forM_)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.IO.Unlift (MonadUnliftIO)
-import Control.Monad.Logger (MonadLogger)
+import Control.Monad.Logger (MonadLogger, MonadLoggerIO)
 import Control.Monad.Reader (MonadReader(..), runReaderT)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Data.Monoid ((<>))
@@ -165,7 +165,8 @@ runDB :: (MonadReader ConnectionString m,
           MonadIO m,
           MonadBaseControl IO m,
           MonadUnliftIO m,
-          MonadLogger m)
+          MonadLogger m,
+          MonadLoggerIO m)
       => SqlPersistT m a -> m a
 runDB query = do
   -- | Helper for running a query

@@ -11,7 +11,7 @@ module Blog
 
 import           Control.Monad.Base          (MonadBase (..))
 import           Control.Monad.IO.Unlift     (MonadUnliftIO(..), wrappedWithRunInIO)
-import           Control.Monad.Logger        (MonadLogger, NoLoggingT (..))
+import           Control.Monad.Logger        (MonadLogger, MonadLoggerIO, NoLoggingT (..))
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control (ComposeSt, MonadBaseControl (..),
                                               MonadTransControl (..),
@@ -24,6 +24,7 @@ newtype BlogT m a = BlogT { unBlogT :: NoLoggingT (ReaderT ConnectionString m) a
            , Applicative
            , Monad
            , MonadLogger
+           , MonadLoggerIO
            , MonadReader ConnectionString
            , MonadIO
            )

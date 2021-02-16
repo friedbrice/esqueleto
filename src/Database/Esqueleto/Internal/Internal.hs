@@ -568,7 +568,7 @@ e ^. field
                         ]
         fieldIdent =
             case e of
-                EEntity _ -> fromDBName info (fieldDB fieldDef)
+                EEntity _ -> fromFieldNameDB info (fieldDB fieldDef)
                 EAliasedEntity baseI _ -> useIdent info $ aliasedEntityColumnIdent baseI fieldDef
                 EAliasedEntityReference a b ->
                     error $ unwords
@@ -1805,7 +1805,7 @@ instance Show FromClause where
 
       where
         dummy = SqlBackend
-            { connEscapeName = \(DBName x) -> x
+            { connEscapeRawName = id
             }
         render' = T.unpack . renderExpr dummy
 
@@ -1992,8 +1992,8 @@ initialIdentState = IdentState mempty
 
 -- | Create a fresh 'Ident'.  If possible, use the given
 -- 'DBName'.
-newIdentFor :: DBName -> SqlQuery Ident
-newIdentFor (DBName original) = Q $ lift $ findFree Nothing
+newIdentFor :: EntityNameDB -> SqlQuery Ident
+newIdentFor (EntityNameDB original) = Q $ lift $ findFree Nothing
   where
     findFree msuffix = do
       let
@@ -2011,7 +2011,7 @@ type IdentInfo = (SqlBackend, IdentState)
 
 -- | Use an identifier.
 useIdent :: IdentInfo -> Ident -> TLB.Builder
-useIdent info (I ident) = fromDBName info $ DBName ident
+useIdent info (I ident) = fromDBName info ident
 
 -- | An expression on the SQL backend.
 --
@@ -2124,7 +2124,7 @@ instance ToSomeValues (SqlExpr (Value a)) where
 fieldName
     :: (PersistEntity val, PersistField typ)
     => IdentInfo -> EntityField val typ -> TLB.Builder
-fieldName info = fromDBName info . fieldDB . persistFieldDef
+fieldName info = fromFieldNameDB info . fieldDB . persistFieldDef
 
 -- FIXME: Composite/non-id pKS not supported on set
 setAux
@@ -2139,8 +2139,14 @@ setAux field mkVal = ESet $ \ent -> unsafeSqlBinOp " = " name (mkVal ent)
 sub :: PersistField a => Mode -> SqlQuery (SqlExpr (Value a)) -> SqlExpr (Value a)
 sub mode query = ERaw Parens $ \info -> toRawSql mode info query
 
-fromDBName :: IdentInfo -> DBName -> TLB.Builder
-fromDBName (conn, _) = TLB.fromText . connEscapeName conn
+fromDBName :: IdentInfo -> T.Text -> TLB.Builder
+fromDBName (conn, _) = TLB.fromText . connEscapeRawName conn
+
+fromFieldNameDB :: IdentInfo -> FieldNameDB -> TLB.Builder
+fromFieldNameDB info = fromDBName info . unFieldNameDB
+
+fromEntityNameDB :: IdentInfo -> EntityNameDB -> TLB.Builder
+fromEntityNameDB info = fromDBName info . unEntityNameDB
 
 existsHelper :: SqlQuery () -> SqlExpr (Value Bool)
 existsHelper = sub SELECT . (>> return true)
@@ -2901,8 +2907,8 @@ makeFrom info mode fs = ret
         (useIdent info ident, mempty)
 
     base ident@(I identText) def =
-        let db@(DBName dbText) = entityDB def
-        in ( fromDBName info db <>
+        let db@(EntityNameDB dbText) = entityDB def
+        in ( fromEntityNameDB info db <>
                  if dbText == identText
                  then mempty
                  else " AS " <> useIdent info ident
@@ -3031,7 +3037,7 @@ valueReferenceToRawSql sourceIdent columnIdentF info =
 
 aliasedEntityColumnIdent :: Ident -> FieldDef -> Ident
 aliasedEntityColumnIdent (I baseIdent) field =
-    I (baseIdent <> "_" <> (unDBName $ fieldDB field))
+    I (baseIdent <> "_" <> (unFieldNameDB $ fieldDB field))
 
 aliasedColumnName :: Ident -> IdentInfo -> T.Text -> TLB.Builder
 aliasedColumnName (I baseIdent) info columnName =
@@ -3065,11 +3071,11 @@ instance SqlSelect (SqlExpr InsertFinal) InsertFinal where
     sqlInsertInto info (EInsertFinal (EInsert p _)) =
         let fields =
                 uncommas $
-                map (fromDBName info . fieldDB) $
+                map (fromFieldNameDB info . fieldDB) $
                 entityFields $
                 entityDef p
             table  =
-                fromDBName info . entityDB . entityDef $ p
+                fromEntityNameDB info . entityDB . entityDef $ p
         in
             ("INSERT INTO " <> table <> parens fields <> "\n", [])
     sqlSelectCols info (EInsertFinal (EInsert _ f)) = f info
@@ -3083,7 +3089,7 @@ instance SqlSelect () () where
     sqlSelectColCount _ = 1
     sqlSelectProcessRow _ = Right ()
 
-unescapedColumnNames :: EntityDef -> [DBName]
+unescapedColumnNames :: EntityDef -> [FieldNameDB]
 unescapedColumnNames ent =
     (if hasCompositeKey ent then id else ( fieldDB (entityId ent) :))
     $ map fieldDB (entityFields ent)
@@ -3109,14 +3115,14 @@ instance PersistEntity a => SqlSelect (SqlExpr (Entity a)) (Entity a) where
         process ed = uncommas $
                      map ((name <>) . aliasName) $
                      unescapedColumnNames ed
-        aliasName columnName = (fromDBName info columnName) <> " AS " <> aliasedColumnName aliasIdent info (unDBName columnName)
+        aliasName columnName = (fromFieldNameDB info columnName) <> " AS " <> aliasedColumnName aliasIdent info (unFieldNameDB columnName)
         name = useIdent info tableIdent <> "."
         ret = let ed = entityDef $ getEntityVal $ return expr
               in (process ed, mempty)
     sqlSelectCols info expr@(EAliasedEntityReference sourceIdent baseIdent) = ret
       where
         process ed = uncommas $
-                     map ((name <>) . aliasedColumnName baseIdent info . unDBName) $
+                     map ((name <>) . aliasedColumnName baseIdent info . unFieldNameDB) $
                      unescapedColumnNames ed
         name = useIdent info sourceIdent <> "."
         ret = let ed = entityDef $ getEntityVal $ return expr

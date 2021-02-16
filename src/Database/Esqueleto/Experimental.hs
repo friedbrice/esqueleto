@@ -1054,7 +1054,7 @@ from parts = do
 
     runFrom (SqlSetOperation operation) = do
         (aliasedOperation, ret) <- aliasQueries operation
-        ident <- newIdentFor (DBName "u")
+        ident <- newIdentFor (EntityNameDB "u")
         ref <- toAliasReference ident ret
         pure (ref, FromQuery ident (operationToSql aliasedOperation) NormalSubQuery)
 
@@ -1163,7 +1163,7 @@ fromSubQuery subqueryType subquery = do
     -- Make a fake query with the aliased results, this allows us to ensure that the query is only run once
     let aliasedQuery = Q $ W.WriterT $ pure (aliasedValue, sideData)
     -- Add the FromQuery that renders the subquery to our side data
-    subqueryAlias <- newIdentFor (DBName "q")
+    subqueryAlias <- newIdentFor (EntityNameDB "q")
     -- Pass the aliased results of the subquery to the outer query
     -- create aliased references from the outer query results (e.g value from subquery will be `subquery`.`value`),
     -- this is probably overkill as the aliases should already be unique but seems to be good practice.
@@ -1199,7 +1199,7 @@ with query = do
     (ret, sideData) <- Q $ W.censor (\_ -> mempty) $ W.listen $ unQ query
     aliasedValue <- toAlias ret
     let aliasedQuery = Q $ W.WriterT $ pure (aliasedValue, sideData)
-    ident <- newIdentFor (DBName "cte")
+    ident <- newIdentFor (EntityNameDB "cte")
     let clause = CommonTableExpressionClause NormalCommonTableExpression ident (\info -> toRawSql SELECT info aliasedQuery)
     Q $ W.tell mempty{sdCteClause = [clause]}
     ref <- toAliasReference ident aliasedValue
@@ -1250,7 +1250,7 @@ withRecursive baseCase unionKind recursiveCase = do
     (ret, sideData) <- Q $ W.censor (\_ -> mempty) $ W.listen $ unQ baseCase
     aliasedValue <- toAlias ret
     let aliasedQuery = Q $ W.WriterT $ pure (aliasedValue, sideData)
-    ident <- newIdentFor (DBName "cte")
+    ident <- newIdentFor (EntityNameDB "cte")
     ref <- toAliasReference ident aliasedValue
     let refFrom = FromCte ident ref
     let recursiveQuery = recursiveCase refFrom
@@ -1272,14 +1272,14 @@ class ToAlias a where
 instance ToAlias (SqlExpr (Value a)) where
     toAlias v@(EAliasedValue _ _) = pure v
     toAlias v = do
-        ident <- newIdentFor (DBName "v")
+        ident <- newIdentFor (EntityNameDB "v")
         pure $ EAliasedValue ident v
 
 instance ToAlias (SqlExpr (Entity a)) where
     toAlias v@(EAliasedEntityReference _ _) = pure v
     toAlias v@(EAliasedEntity _ _) = pure v
     toAlias (EEntity tableIdent) = do
-       ident <- newIdentFor (DBName "v")
+       ident <- newIdentFor (EntityNameDB "v")
        pure $ EAliasedEntity ident tableIdent
 
 instance ToAlias (SqlExpr (Maybe (Entity a))) where
